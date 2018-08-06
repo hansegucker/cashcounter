@@ -2,45 +2,31 @@ import sys
 import threading
 import time
 
-import rpyc
-
 #################
 # EV3 INIT CODE #
 #################
 
 # Connect ev3 over rpyc
-from const import TRAP_MODE_CLOSED, TRAP_MODE_HALF, TRAP_MODE_OPEN, R_MAX, G_MAX, B_MAX
-from help import re_map
-
-conn = rpyc.classic.connect('ev3dev.local')  # host name or IP address of the EV3
-ev3 = conn.modules['ev3dev.ev3']  # import ev3dev.ev3 remotely
-fonts = conn.modules['ev3dev.fonts']
-
-# Init Motors
-band = ev3.LargeMotor('outA')
-trap = ev3.LargeMotor('outB')
-detecting_motor = ev3.MediumMotor('outD')
-
-# Init Sensors
-ir = ev3.InfraredSensor()
-ir.mode = 'IR-PROX'
-cl = ev3.ColorSensor()
-cl.mode = 'RGB-RAW'
-ts = ev3.TouchSensor()
-
+from ev3.band import Band
+from ev3.ev3 import EV3
 
 # Threading
+from logic import TrapManagement
+
+
 class TrapLoop(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
-        self.thread_running = False
+        self.thread_running = False  # For thread system (e. g. stop)
         self.running = False
 
-        self.trap_mode = TRAP_MODE_CLOSED
+        self.ev3 = EV3()
+
+        self.trap_management = TrapManagement(self.ev3)
+
         self.color = (1, 1, 1)
-        self.trap_available = True
         self.refresh = self.dummy
-        self.band_thread = BandLoop()
+        self.band_thread = BandLoop(ev3=ev3)
         self.band_thread.start()
 
     def dummy(self):
@@ -50,101 +36,32 @@ class TrapLoop(threading.Thread):
         self.refresh = refresh
         self.band_thread.set_refresh(refresh)
 
-    def open_trap_completly(self):
-        print(self.trap_mode)
-        if self.trap_mode == TRAP_MODE_CLOSED or self.trap_mode == TRAP_MODE_HALF:
-            self.open_trap()
-            self.refresh()
-            time.sleep(0.5)
-            self.close_trap()
-
-    def open_trap_half(self):
-        if self.trap_mode == TRAP_MODE_CLOSED:
-            self.move_trap(-30)
-            self.trap_mode = TRAP_MODE_HALF
-            print(self.trap_mode)
-
-    def open_trap(self):
-        if self.trap_mode == TRAP_MODE_CLOSED:
-            self.move_trap(-60)
-            self.trap_mode = TRAP_MODE_OPEN
-        elif self.trap_mode == TRAP_MODE_HALF:
-            self.move_trap(-30)
-            print("Minus 30")
-            self.trap_mode = TRAP_MODE_OPEN
-
-    def close_trap(self):
-        if self.trap_mode == TRAP_MODE_OPEN:
-            self.move_trap(59)
-            print("PLUS FULL")
-            self.trap_mode = TRAP_MODE_CLOSED
-        elif self.trap_mode == TRAP_MODE_HALF:
-            self.move_trap(30)
-            self.trap_mode = TRAP_MODE_CLOSED
-
-    def move_trap(self, deg):
-        global trap
-        trap.run_to_rel_pos(position_sp=deg, speed_sp=300, stop_action="hold")
-        trap.wait_while('running')
-
-    def get_color(self):
-        # print(cl.value(0), cl.value(1), cl.value(2))
-        r = round(re_map(cl.value(0), 0, R_MAX, 0, 255), 0)
-        g = round(re_map(cl.value(1), 0, G_MAX, 0, 255), 0)
-        b = round(re_map(cl.value(2), 0, B_MAX, 0, 255), 0)
-        return int(r), int(g), int(b)
-
-    def move_detect(self, deg):
-        global detecting_motor
-        detecting_motor.run_to_rel_pos(position_sp=deg, speed_sp=1000, stop_action="hold")
-        detecting_motor.wait_while('running')
-
-    def measure_width(self):
-        global detecting_motor, ts
-        self.move_detect(2000)
-        count = 0
-        print(ts.is_pressed)
-        while count < 1000 and ts.is_pressed is 0:
-            self.move_detect(200)
-            print("#", ts.is_pressed)
-            print("##", count)
-            count += 200
-        self.move_detect((count * -1) + -2000)
-        return count
-
     def run(self):
-        global cl
-
         self.thread_running = True
         while self.thread_running:
+            # Wait for start by user
             while not self.running:
                 pass
 
+            # Start by user, start band
             if self.running:
                 self.band_thread.start_work()
+
+            # Start trap
             while self.running:
                 # print(cl.value(0), cl.value(1), cl.value(2))
-                print(ts.is_pressed)
-                self.color = self.get_color()
+                # print(ts.is_pressed)
+                self.color = self.ev3.get_color()
                 # print(self.color)
                 # time.sleep(2)
-                if not self.trap_available:
-                    # Measurement
-                    print(self.color)
-                    # time.sleep(0.5)
-                    self.open_trap_half()
-                    # time.sleep(0.2)
-                    self.measure_width()
-                    self.open_trap_completly()
-                    self.trap_available = True
-
-                if self.band_thread.ready_object_on_band and self.trap_available:
+                # Check if band has an coin to measure
+                if self.band_thread.ready_object_on_band and self.trap_management.trap_available:
                     if self.band_thread.get_object_if_available():
-                        self.trap_available = False
-                        time.sleep(1)
+                        # Measure
+                        self.trap_management.measure()
 
+            # Stop band
             self.band_thread.stop_work()
-            band.stop(stop_action="hold")
 
         self.refresh()
 
@@ -174,13 +91,14 @@ class TrapLoop(threading.Thread):
 
 
 class BandLoop(threading.Thread):
-    def __init__(self):
+    def __init__(self, ev3):
         threading.Thread.__init__(self)
         self.thread_running = True
         self.running = False
 
-        self.band_running = False
-        self.band_manual_stopped = False
+        self.ev3 = ev3
+        self.band = Band(self.ev3)
+
         self.ready_object_on_band = False
         self.refresh = self.dummy
         self.distance = 0
@@ -198,44 +116,31 @@ class BandLoop(threading.Thread):
                 pass
 
             while self.running:
-                if not self.ready_object_on_band and not self.band_running and not self.band_manual_stopped:
-                    self.start_band(manual=False)
+                if not self.ready_object_on_band and not self.band.band_running and not self.band.band_manual_stopped:
+                    self.band.start_band(manual=False)
 
-                if not self.ready_object_on_band and self.band_running:
-                    self.distance = ir.value()
-                    # print(distance)
+                if not self.ready_object_on_band and self.band.band_running:
+                    self.distance = self.ev3.ir.value()
+                    print("[DISTANCE]", self.distance)
 
                     if self.distance < 15:
-                        self.stop_band(manual=False)
+                        self.band.stop_band(manual=False)
 
                         self.ready_object_on_band = True
+
+                # Refresh GUI
                 self.refresh()
 
+            # Stop band
+            self.ev3.stop_band()
+
     def get_object_if_available(self):
-        if self.ready_object_on_band and not self.band_manual_stopped:
-            self.start_band(manual=False)
+        if self.ready_object_on_band and not self.band.band_manual_stopped:
+            self.band.start_band(manual=False)
             time.sleep(1)
             self.ready_object_on_band = False
             return True
         return False
-
-    def start_band(self, x=0, manual=True):
-        global band
-        if not manual:
-            self.band_running = True
-        else:
-            self.band_manual_stopped = False
-        band.run_forever(speed_sp=50)
-
-    def stop_band(self, x=0, manual=True):
-        global band
-        if not manual:
-            self.band_manual_stopped = False
-            self.band_running = False
-        else:
-            self.band_manual_stopped = True
-
-        band.stop(stop_action="hold")
 
     def start_work(self):
         self.running = True

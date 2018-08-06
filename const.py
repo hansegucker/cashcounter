@@ -11,6 +11,11 @@ R_MAX = 330
 G_MAX = 340
 B_MAX = 350
 
+# Measure settings
+STEP_BEGINN = 2000
+STEP_WIDTH = 200
+STEP_MAX = 1000
+
 # Coins
 COINS = {
     200: {
