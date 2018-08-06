@@ -26,7 +26,7 @@ class TrapLoop(threading.Thread):
 
         self.color = (1, 1, 1)
         self.refresh = self.dummy
-        self.band_thread = BandLoop(ev3=ev3)
+        self.band_thread = BandLoop(ev3=self.ev3)
         self.band_thread.start()
 
     def dummy(self):
@@ -58,7 +58,7 @@ class TrapLoop(threading.Thread):
                 if self.band_thread.ready_object_on_band and self.trap_management.trap_available:
                     if self.band_thread.get_object_if_available():
                         # Measure
-                        self.trap_management.measure()
+                        self.trap_management.measure_coin()
 
             # Stop band
             self.band_thread.stop_work()
@@ -121,7 +121,7 @@ class BandLoop(threading.Thread):
 
                 if not self.ready_object_on_band and self.band.band_running:
                     self.distance = self.ev3.ir.value()
-                    print("[DISTANCE]", self.distance)
+                    # print("[DISTANCE]", self.distance)
 
                     if self.distance < 15:
                         self.band.stop_band(manual=False)

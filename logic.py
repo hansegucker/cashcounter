@@ -1,3 +1,5 @@
+import time
+
 from ev3.measure import Measure
 from ev3.trap import Trap
 
@@ -11,7 +13,7 @@ class TrapManagement:
 
         self.trap_available = True
 
-    def measure(self):
+    def measure_coin(self):
         # Block trap
         self.trap_available = False
 

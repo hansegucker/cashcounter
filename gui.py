@@ -115,11 +115,11 @@ class Controller(QWidget):
         self.band_group_layout.addWidget(self.band_status_label)
 
         self.btn_start_band = QPushButton("Fließband starten")
-        self.btn_start_band.clicked.connect(self.thread.band_thread.start_band)
+        self.btn_start_band.clicked.connect(self.thread.band_thread.band.start_band)
         self.band_group_layout.addWidget(self.btn_start_band)
 
         self.btn_stop_band = QPushButton("Fließband stoppen")
-        self.btn_stop_band.clicked.connect(self.thread.band_thread.stop_band)
+        self.btn_stop_band.clicked.connect(self.thread.band_thread.band.stop_band)
         self.band_group_layout.addWidget(self.btn_stop_band)
 
         ##########
@@ -139,7 +139,7 @@ class Controller(QWidget):
         self.trap_vbox1.addWidget(self.trap_status_label)
 
         self.btn_open_trap_completly = QPushButton("Klappe öffnen")
-        self.btn_open_trap_completly.clicked.connect(self.thread.open_trap_completly)
+        self.btn_open_trap_completly.clicked.connect(self.thread.trap_management.trap.open_trap_completly)
         self.trap_vbox1.addWidget(self.btn_open_trap_completly)
 
         self.trap_vbox2 = QVBoxLayout()
@@ -285,10 +285,10 @@ class Controller(QWidget):
 
     def open_trap_with_deg(self):
         print("HI")
-        self.thread.move_trap(self.get_trap_deg() * -1)
+        self.thread.ev3.move_trap(self.get_trap_deg() * -1)
 
     def close_trap_with_deg(self):
-        self.thread.move_trap(self.get_trap_deg())
+        self.thread.ev3.move_trap(self.get_trap_deg())
 
     def get_detect_deg(self):
         t = self.detect_deg_edit.text()
@@ -297,18 +297,18 @@ class Controller(QWidget):
 
     def open_detect_with_deg(self):
         print("HI")
-        self.thread.move_detect(self.get_detect_deg())
+        self.thread.ev3.move_measure(self.get_detect_deg())
 
     def close_detect_with_deg(self):
-        self.thread.move_detect(self.get_detect_deg() * -1)
+        self.thread.ev3.move_measure(self.get_detect_deg() * -1)
 
     def refresh(self):
         # print("REFRESH BECAUSE STATE CHANGED")
-        if self.thread.band_thread.band_manual_stopped:
+        if self.thread.band_thread.band.band_manual_stopped:
             t = "Manuell gestoppt"
             self.btn_start_band.setEnabled(True)
             self.btn_stop_band.setEnabled(False)
-        elif self.thread.band_thread.band_running:
+        elif self.thread.band_thread.band.band_running:
             t = "In Betrieb (Automatisch)"
             self.btn_start_band.setEnabled(False)
             self.btn_stop_band.setEnabled(True)
@@ -319,7 +319,7 @@ class Controller(QWidget):
 
         self.band_status_label.setText(t)
 
-        if self.thread.trap_mode == TRAP_MODE_CLOSED:
+        if self.thread.trap_management.trap.trap_mode == TRAP_MODE_CLOSED:
             t = "Geschlossen"
             self.btn_open_trap_completly.setEnabled(True)
 

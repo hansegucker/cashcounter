@@ -50,7 +50,7 @@ class EV3():
         r = round(re_map(self.cl.value(0), 0, R_MAX, 0, 255), 0)
         g = round(re_map(self.cl.value(1), 0, G_MAX, 0, 255), 0)
         b = round(re_map(self.cl.value(2), 0, B_MAX, 0, 255), 0)
-        print("[COLOR] ", r, ",", g, ",", b)
+        # print("[COLOR] ", r, ",", g, ",", b)
         return int(r), int(g), int(b)
 
     def is_pressed(self):
