@@ -1,7 +1,7 @@
 import sys
 from PyQt5.QtWidgets import *
 
-from gui import Controller
+from gui.gui import Controller
 
 if __name__ == '__main__':
     try:

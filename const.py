@@ -38,4 +38,8 @@ COINS = {
         "amount": 0.10,
         "res": "10.png"
     },
+    0: {
+        "amount": 0,
+        "res": "0.png"
+    },
 }

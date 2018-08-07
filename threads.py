@@ -137,7 +137,7 @@ class BandLoop(threading.Thread):
     def get_object_if_available(self):
         if self.ready_object_on_band and not self.band.band_manual_stopped:
             self.band.start_band(manual=False)
-            time.sleep(1)
+            time.sleep(1.5)
             self.ready_object_on_band = False
             return True
         return False
